@@ -3,17 +3,18 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import requests
 from bs4 import BeautifulSoup
-import pandas as pd
 import time
 # Import the function from my_module
-from qalistUtil import convert_texts_into_q_with_links_list, push_qa_category_to_qalist, export_to_json
+from utils import convert_texts_into_q_with_links_list, push_qa_category_to_qalist, export_to_json
+from utils.qalist_util import scrape_answer_texts, scrape_question_texts
 
+# Tabの数 - 1
 totalTubs = 6 - 1
+# totalTubs = 1 # for test 
 qaList = []
 
-for i in range(0,totalTubs):
+for i in range(0, totalTubs):
 
     # Navigate to the URL of the site
     tabNum = i
@@ -25,6 +26,7 @@ for i in range(0,totalTubs):
 
     # オフィサポFAQのクラス名が連番でないため（会議室予約FAQだけなぜかicon-07になってる。理想はicon-06なのだが。。）
     icon_number = i + 2 if i == 5 else i + 1
+
     # タブがクリックできる状態になっているのかを確認した後、クリック
     is_category_active = WebDriverWait(driver, 1).until(
         EC.element_to_be_clickable((By.CSS_SELECTOR, f'.faq-listtab.js-tabsarea li.icon-0{icon_number}'))
@@ -39,31 +41,15 @@ for i in range(0,totalTubs):
     # 画面がロードされるまで待つ
     time.sleep(1)
 
-
-    # Extract the page source and parse it with BeautifulSoup
+    # Page ソースを取得してBeautifulSoupでスクレイピングする
     page_source = driver.page_source
-    soup = BeautifulSoup(page_source, 'html.parser')
 
-    category_text = soup.find('li', class_=f'icon-0{icon_number} active').text
-    category_title = f'{category_text}に関する質問'
-
-    # Find the second fq-list-box js-tabContents with the class 'is-show'
-    faq_section = soup.find('section', class_='fq-list-box js-tabContents is-show')
-    # 質問のタイトルの場所を確認
-    question_titles = faq_section.find('dl', class_='faqlist__item js-faqAccordion')
-    # 'lazyload' か 'lazyloaded' がクラス名になっている質問Elementを抽出
-    if len(question_titles.find_all('dt', class_='lazyloaded')) > 0:
-        faq_elements = question_titles.find_all('dt', class_='lazyloaded')
-    elif len(question_titles.find_all('dt', class_='lazyload')) > 0:
-        faq_elements = question_titles.find_all('dt', class_='lazyload')
-
-    # Elementのテキスト部分のみを抽出
-    faq_texts = [faq.text.strip() for faq in faq_elements]
-    # 質問文へのLinkを抽出
-    faq_text_links = [ f'{url}#{i+1}' for i in range(0,len(faq_elements))]
+    # サイトからQAを取得
+    category_title, faq_texts, faq_text_links = scrape_question_texts(page_source, icon_number, url, i)
+    answer_texts = scrape_answer_texts(page_source)
 
     # カテゴリの塊を作成
-    qa_list = convert_texts_into_q_with_links_list(category_title, faq_texts, faq_text_links, i)
+    qa_list = convert_texts_into_q_with_links_list(category_title, faq_texts, faq_text_links, answer_texts, i)
 
     # QAリストに格納
     push_qa_category_to_qalist(qaList, qa_list)
@@ -71,6 +57,6 @@ for i in range(0,totalTubs):
     # ブラウザ閉じる
     driver.quit()
 
-print(qaList)
+# print(qaList)
 # JSON形式で出力
 export_to_json(qaList, '.')
