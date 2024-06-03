@@ -22,7 +22,7 @@ def scrape_question_texts(page_source, icon_number, url, iterateNum):
     # Elementのテキスト部分のみを抽出
     faq_texts = [faq.text.strip() for faq in faq_elements]
     # 質問文へのLinkを抽出
-    faq_text_links = [ f'{url}#{iterateNum + 1}' for i in range(0,len(faq_elements))]
+    faq_text_links = [ f'{url}#{i + 1}' for i in range(0,len(faq_elements))]
 
     return category_title, faq_texts, faq_text_links
 
@@ -43,7 +43,7 @@ def scrape_answer_texts(page_source):
 def convert_texts_into_q_with_links_list(categoryTitle, questionTexts, links, answerTexts, iterateNum):
     # Create the output structure
     output = {
-        "categoryId": f'10000{iterateNum + 1}',
+        "categoryId": f'{100000 + iterateNum + 1}',
         "categoryTitle": categoryTitle,
         "questions": [],
         "answers": []
@@ -70,9 +70,28 @@ def convert_texts_into_q_with_links_list(categoryTitle, questionTexts, links, an
     
     return output
 
-def push_qa_category_to_qalist(qaList, categoryObj):
-    qaList.append(categoryObj)
-    return qaList
+def convert_category_title_to_group(categoryTitle, iterateNum):
+    return {
+        "categoryId": f'{100000 + iterateNum + 1}',
+        "categoryTitle": categoryTitle,
+        "index": categoryTitle.split()
+    }
+    
+
+def push_obj_to_list(list, obj):
+    list.append(obj)
+    return list
+
+def push_qa_category_to_first_question_list(firstQuestionList, categoryTitles):
+
+    for(categoryTitle,i) in categoryTitles:
+       categoryObj =  {
+           'id': f'{100000 + i + 1}',
+           'title': categoryTitle,
+           'index': categoryTitle.split()
+       }
+    firstQuestionList.append(categoryObj)
+    return firstQuestionList
 
 def create_dir(base_dir):
     current_datetime = datetime.now().strftime('%Y%m%d%H%M%S')
@@ -81,10 +100,10 @@ def create_dir(base_dir):
     os.makedirs(dir_path, exist_ok=True)
     return dir_path
 
-def export_to_json(qaList, file_path):
+def export_to_json(qaList, file_path, file_name):
     """Export the qaList object to a JSON file."""
     # Define the file path for the JSON file
     dir_path = create_dir(file_path)
-    file_path = os.path.join(dir_path, 'qaList.json')
+    file_path = os.path.join(dir_path, file_name)
     with open(file_path, 'w', encoding='utf-8') as json_file:
         json.dump(qaList, json_file, ensure_ascii=False, indent=4)
