@@ -1,13 +1,13 @@
 ## initialize project
 
 ```
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 ```
 
 ## install required packages
 ```
-pip install requests beautifulsoup4 pandas
+pip install -r requirements.txt
 ```
 
 ## how to scrape the FAQ from Office Support

@@ -44,7 +44,7 @@ def convert_texts_into_q_with_links_list(categoryTitle, questionTexts, links, an
     # Create the output structure
     output = {
         "categoryId": f'{100000 + iterateNum + 1}',
-        "categoryTitle": categoryTitle,
+        "category": categoryTitle,
         "questions": [],
         "answers": []
     }
@@ -72,8 +72,8 @@ def convert_texts_into_q_with_links_list(categoryTitle, questionTexts, links, an
 
 def convert_category_title_to_group(categoryTitle, iterateNum):
     return {
-        "categoryId": f'{100000 + iterateNum + 1}',
-        "categoryTitle": categoryTitle,
+        "id": f'{100000 + iterateNum + 1}',
+        "title": categoryTitle,
         "index": categoryTitle.split()
     }
     
