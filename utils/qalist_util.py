@@ -1,10 +1,12 @@
 from datetime import datetime
 import json
 import os
+import re
 
 from bs4 import BeautifulSoup
 
 def scrape_question_texts(page_source, icon_number, url, iterateNum):
+    print("icon_number, ==========================%d=====================================", icon_number)
     soup = BeautifulSoup(page_source, 'html.parser')
 
     category_text = soup.find('li', class_=f'icon-0{icon_number} active').text
@@ -13,13 +15,19 @@ def scrape_question_texts(page_source, icon_number, url, iterateNum):
     faq_section = soup.find('section', class_='fq-list-box js-tabContents is-show')
     # 質問のタイトルの場所を確認
     question_titles = faq_section.find('dl', class_='faqlist__item js-faqAccordion')
-    # 'lazyload' か 'lazyloaded' がクラス名になっている質問Elementを抽出
-    if len(question_titles.find_all('dt', class_='lazyloaded')) > 0:
-        faq_elements = question_titles.find_all('dt', class_='lazyloaded')
-    elif len(question_titles.find_all('dt', class_='lazyload')) > 0:
-        faq_elements = question_titles.find_all('dt', class_='lazyload')
 
-    # Elementのテキスト部分のみを抽出
+    # 'lazyload' か 'lazyloaded' がクラス名になっている質問Elementを抽出
+    faq_elements = []
+    question_titles = faq_section.find('dl', class_='faqlist__item js-faqAccordion')
+    if len(question_titles.find_all('dt', class_='lazyloaded')) > 0:
+        for element in question_titles.find_all('dt', class_='lazyloaded'):
+            faq_elements.append(element)
+
+    if len(question_titles.find_all('dt', class_='lazyload')) > 0:
+        for element in question_titles.find_all('dt', class_='lazyload'):
+            faq_elements.append(element)
+
+    # dtタグで囲まれている質問のテキストのみを抽出
     faq_texts = [faq.text.strip() for faq in faq_elements]
     # 質問文へのLinkを抽出
     faq_text_links = [ f'{url}#{i + 1}' for i in range(0,len(faq_elements))]
@@ -29,19 +37,18 @@ def scrape_question_texts(page_source, icon_number, url, iterateNum):
 def scrape_answer_texts(page_source):
     soup = BeautifulSoup(page_source, 'html.parser')
     faq_section = soup.find('section', class_='fq-list-box js-tabContents is-show')
-
-    # 質問のタイトルの場所を確認
+    # QA要素がある場所を確認して、回答のみ抽出
     question_titles = faq_section.find('dl', class_='faqlist__item js-faqAccordion')
     answers =  question_titles.find_all('dd')
 
     # 文字だけを抽出
-    answer_texts = [answer.text.strip() for answer in answers]
+    answer_texts = [process_text(answer.text.strip()) for answer in answers]
 
     return answer_texts
 
 
 def convert_texts_into_q_with_links_list(categoryTitle, questionTexts, links, answerTexts, iterateNum):
-    # Create the output structure
+    # 出力用の構造体を作成
     output = {
         "categoryId": f'{100000 + iterateNum + 1}',
         "category": categoryTitle,
@@ -49,7 +56,7 @@ def convert_texts_into_q_with_links_list(categoryTitle, questionTexts, links, an
         "answers": []
     }
 
-    # Iterate through questions and links to populate the structure
+    # 質問と回答をリストに追加
     for i, (question, answer, link) in enumerate(zip(questionTexts, answerTexts, links)):
         question_id = f"Q{(iterateNum+1) * 10000 + i}"
         keywords_question = question.split()
@@ -62,7 +69,7 @@ def convert_texts_into_q_with_links_list(categoryTitle, questionTexts, links, an
         })
         
         output["answers"].append({
-            "id": question_id,
+            "questionId": question_id,
             "content": answer,
             "link": link,
             "index": keywords_answer
@@ -95,15 +102,33 @@ def push_qa_category_to_first_question_list(firstQuestionList, categoryTitles):
 
 def create_dir(base_dir):
     current_datetime = datetime.now().strftime('%Y%m%d%H%M%S')
-    # Create a new directory with the current date and time
+    # 現在の日付と時刻を使用して新しいディレクトリを作成
     dir_path = os.path.join(base_dir, current_datetime)
     os.makedirs(dir_path, exist_ok=True)
     return dir_path
 
 def export_to_json(qaList, file_path, file_name):
     """Export the qaList object to a JSON file."""
-    # Define the file path for the JSON file
+    # JSONファイルのパスを定義
     dir_path = create_dir(file_path)
     file_path = os.path.join(dir_path, file_name)
     with open(file_path, 'w', encoding='utf-8') as json_file:
         json.dump(qaList, json_file, ensure_ascii=False, indent=4)
+
+
+def process_text(text):
+    # 改行を<br>に変換
+    text = text.replace('\n', '<br>')
+    # 複数の<br>を1つにまとめる
+    text = re.sub(r'(?:<br>)+', '<br>', text)
+    # タブ補完を削除
+    text = text.replace('                 ', '')
+    # URLを<a>タグに変換
+    url_pattern = re.compile(r'(https://[^\s]+)')
+    text = url_pattern.sub(r'<a href="\1" target="_blank">\1</a>', text)
+    
+    # aタグに含まれる<br>を削除
+    text = re.sub(r'<a href="([^"]*?)<br>([^"]*?)"', r'<a href="\1\2"', text)
+    text = re.sub(r'(\bhttps://[^\s]+)<br>(</a>)', r'\1\2', text)
+
+    return text
